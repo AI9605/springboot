@@ -2,6 +2,8 @@ package com.smhrd.board.entity;
 
 import java.time.LocalDate;
 
+import org.joda.time.LocalDateTime;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -42,8 +44,12 @@ public class BoardEntity {
 	
 	// 글 작성 시 자동으로 writeDay가 입력 되도록 코드 작성
 	// entity 가 생성 될 때 실행하는 코드 
+	@Column(nullable = false)
+	private LocalDateTime time;
+	
 	@PrePersist
 	protected void onCreate() {
 		this.writeDay = LocalDate.now();
+		this.time = LocalDateTime.now();
 	}
 }
