@@ -1,6 +1,5 @@
 package com.smhrd.board.controller;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,6 +16,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
+
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.model.CannedAccessControlList;
+import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.PutObjectRequest;
+import com.smhrd.board.config.BucketConfig;
 import com.smhrd.board.config.FileUploadConifg;
 import com.smhrd.board.entity.BoardEntity;
 import com.smhrd.board.entity.UserEntity;
@@ -30,9 +35,13 @@ public class BoardController {
 	@Autowired
 	BoardService boardService;
 
+	private final BucketConfig bucketConfig;
+    private final AmazonS3 amazonS3;
 	private final FileUploadConifg fileUploadConifg;
 
-	BoardController(FileUploadConifg fileUploadConifg) {
+	BoardController(FileUploadConifg fileUploadConifg, BucketConfig bucketConfig, AmazonS3 amazonS3) {
+		this.amazonS3 = amazonS3;
+		this.bucketConfig = bucketConfig;
 		this.fileUploadConifg = fileUploadConifg;
 	}
 
@@ -52,38 +61,23 @@ public class BoardController {
 		if (!image.isEmpty()) {
 			// 이미지의 이름
 			String img_name = image.getOriginalFilename();
-			// Java 안에 고유 번호를 만드는 객체 - UUID
-			// 이미지의 고유 이름 부여
+
 			String file_name = UUID.randomUUID() + "_" + img_name;
-			// random 값 _ 이미지이름
-
-			// C:/upload 폴더에 저장 할 예정
-			// --> 업로드 할 경로를 변수로 가지고 오기
-			String uploadDir = fileUploadConifg.getUploadDir();
-
-			// ex) C:/upload/123_1 로 저장
-			String filePath = Paths.get(uploadDir, file_name).toString();
-			// uploadDir + file_name 으로 작성시 OS에 따라 경로 못잡음
-
-			// 파일 경로 확인 후 이미지 저장
+	
 			try {
-				image.transferTo(new File(filePath));
+				ObjectMetadata metadata = new ObjectMetadata();
+		        metadata.setContentLength(image.getSize());
+		        metadata.setContentType(image.getContentType());
 
-				// 경로를 별도의 변수에 저장
-				imgPath = "/uploads/" + file_name;
+		        PutObjectRequest request = new PutObjectRequest(bucketConfig.getbucketName(), file_name, image.getInputStream(), metadata)
+		                .withCannedAcl(CannedAccessControlList.PublicRead); // public 접근 허용
 
-			} catch (IllegalStateException e) {
-				e.printStackTrace();
-			} catch (IOException e) {
+		        amazonS3.putObject(request);
+		        imgPath = amazonS3.getUrl(bucketConfig.getbucketName(), file_name).toString();
+			}catch (Exception e) {
 				e.printStackTrace();
 			}
-
 		}
-
-		// DB 저장
-		// service 객체를 통해
-		// BoardService -> BoardRepository
-		// Save()
 
 		BoardEntity entity = new BoardEntity();
 		entity.setTitle(title);
